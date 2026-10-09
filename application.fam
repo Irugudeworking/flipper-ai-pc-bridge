@@ -1,0 +1,23 @@
+App(
+    appid="flipper_ai_bridge",
+    name="Flipper AI Bridge",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="flipper_ai_bridge_main",
+    stack_size=4096,
+    fap_version=(0, 1),
+    fap_category="Tools",
+    fap_description="Owner-operated phone to PC HID bridge",
+    fap_author="Flipper AI PC Bridge",
+    requires=["gui"],
+    sources=[
+        "src/main.c",
+        "src/app.c",
+        "src/protocol/*.c",
+        "src/transport/*.c",
+        "src/hid/*.c",
+        "src/ui/*.c",
+        "src/safety/*.c",
+        "src/queue/*.c",
+        "src/transfer/*.c",
+    ],
+)

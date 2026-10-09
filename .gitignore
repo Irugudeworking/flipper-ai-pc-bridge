@@ -1,0 +1,8 @@
+.gradle/
+**/build/
+build-host/
+local.properties
+*.apk
+!dist/flipper_ai_brain.apk
+*.aab
+work/
