@@ -7,6 +7,13 @@
 
 #define HID_TAP_MS 15U
 
+/* The wire format uses USB HID usages. Flipper's HAL expects modifier keys
+ * in the high byte rather than their usage values (0xE0..0xE7). */
+static uint16_t bridge_hal_keycode(uint16_t usage) {
+    return usage >= 0xE0U && usage <= 0xE7U ?
+               (uint16_t)(1U << (8U + usage - 0xE0U)) : usage;
+}
+
 bool bridge_hid_init(BridgeHidExecutor* hid) {
     furi_check(hid);
     bool ok = bridge_usb_select_hid();
@@ -28,21 +35,21 @@ bool bridge_hid_connected(void) {
 }
 
 bool bridge_hid_key_down(uint16_t keycode) {
-    return furi_hal_hid_kb_press(keycode);
+    return furi_hal_hid_kb_press(bridge_hal_keycode(keycode));
 }
 
 bool bridge_hid_key_up(uint16_t keycode) {
-    return furi_hal_hid_kb_release(keycode);
+    return furi_hal_hid_kb_release(bridge_hal_keycode(keycode));
 }
 
 bool bridge_hid_key_tap(uint16_t keycode) {
-    if(!furi_hal_hid_kb_press(keycode)) return false;
+    if(!furi_hal_hid_kb_press(bridge_hal_keycode(keycode))) return false;
     furi_delay_ms(HID_TAP_MS);
     return furi_hal_hid_kb_release_all();
 }
 
 bool bridge_hid_hotkey(uint8_t modifiers, uint16_t keycode) {
-    uint16_t usage = keycode;
+    uint16_t usage = bridge_hal_keycode(keycode);
     if(modifiers & 0x01U) usage |= KEY_MOD_LEFT_CTRL;
     if(modifiers & 0x02U) usage |= KEY_MOD_LEFT_SHIFT;
     if(modifiers & 0x04U) usage |= KEY_MOD_LEFT_ALT;

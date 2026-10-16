@@ -6,13 +6,6 @@
 #include <furi_hal_usb_cdc.h>
 #include <furi_hal_usb_hid.h>
 
-static FuriHalUsbHidConfig hid_config = {
-    .vid = 0,
-    .pid = 0,
-    .manuf = "Flipper Devices",
-    .product = "Flipper AI Bridge",
-};
-
 static void bridge_cdc_state_callback(void* context, CdcState state) {
     BridgeApp* app = context;
     if(!app) return;
@@ -42,7 +35,9 @@ static CdcCallbacks cdc_callbacks = {
 };
 
 bool bridge_usb_select_hid(void) {
-    return furi_hal_usb_set_config(&usb_hid, &hid_config);
+    /* NULL selects the firmware's valid default HID VID/PID. A non-NULL
+     * FuriHalUsbHidConfig copies its VID/PID verbatim into the descriptor. */
+    return furi_hal_usb_set_config(&usb_hid, NULL);
 }
 
 bool bridge_usb_select_cdc(BridgeApp* app) {

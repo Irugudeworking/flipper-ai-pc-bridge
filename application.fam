@@ -4,7 +4,7 @@ App(
     apptype=FlipperAppType.EXTERNAL,
     entry_point="flipper_ai_bridge_main",
     stack_size=4096,
-    fap_version=(0, 1),
+    fap_version=(0, 2),
     fap_category="Tools",
     fap_description="Owner-operated phone to PC HID bridge",
     fap_author="Flipper AI PC Bridge",

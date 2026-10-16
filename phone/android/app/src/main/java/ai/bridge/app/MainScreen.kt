@@ -99,7 +99,13 @@ internal fun FlipperBrainApp(vm: MainViewModel) {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 20.dp, vertical = 14.dp)) {
                 Text("FLIPPER AI BRAIN", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(3.dp))
-                Text(if(state.connected) "●  ${state.activeDeviceName.ifBlank { "Flipper connected" }} · ${if(state.bridgeRunning) "Bridge ready" else "Open bridge on Flipper"}" else "○  ${state.status}", style = MaterialTheme.typography.bodySmall)
+                val bridgeStatus = when {
+                    !state.bridgeRunning -> "Open bridge on Flipper"
+                    !state.capabilities.connected -> "Bridge starting"
+                    !state.capabilities.keyboard || !state.capabilities.mouse -> "USB HID error"
+                    else -> "Bridge ready"
+                }
+                Text(if(state.connected) "●  ${state.activeDeviceName.ifBlank { "Flipper connected" }} · $bridgeStatus" else "○  ${state.status}", style = MaterialTheme.typography.bodySmall)
             }
         },
         bottomBar = {
@@ -145,7 +151,11 @@ private fun BrainScreen(state: AppUiState, vm: MainViewModel, requestBle: () -> 
                         if(state.connected) OutlinedButton(onClick = vm::disconnect) { Text("DISCONNECT") }
                         else Button(onClick = requestBle) { Text(if(state.scanInProgress) "SCANNING…" else "FIND FLIPPER") }
                     }
-                    if(state.connected) Text(if(state.capabilities.keyboard && state.capabilities.mouse) "Flipper HID available · keyboard and mouse" else "Open AI Bridge in Tools on Flipper to start")
+                    if(state.connected) Text(when {
+                        state.capabilities.keyboard && state.capabilities.mouse -> "Flipper HID available · check USB: HID / CONNECTED on Flipper"
+                        state.bridgeRunning && state.capabilities.connected -> "USB HID mode failed on Flipper; see Diagnostics"
+                        else -> "Open AI Bridge in Tools on Flipper to start"
+                    })
                     if(!state.connected && state.devices.isNotEmpty()) {
                         Divider()
                         Text("Paired and nearby devices", fontWeight = FontWeight.SemiBold)
@@ -245,7 +255,9 @@ private fun ManualScreen(state: AppUiState, vm: MainViewModel) {
         item {
             Card { Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Manual HID control", style = MaterialTheme.typography.titleMedium)
-                Text(if(state.connected && state.capabilities.keyboard) "Connected to ${state.activeDeviceName}" else "Connect Flipper and confirm keyboard capability", style = MaterialTheme.typography.bodySmall)
+                Text(if(state.connected && state.capabilities.keyboard) "Connected to ${state.activeDeviceName}. Flipper must show USB: HID / CONNECTED."
+                     else "Connect Flipper and confirm keyboard capability", style = MaterialTheme.typography.bodySmall)
+                if(state.lastError.isNotBlank()) Text(state.lastError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { ControlButton("↑") { vm.sendManual(AgentAction.Key(82)) } }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     ControlButton("←") { vm.sendManual(AgentAction.Key(80)) }

@@ -11,13 +11,15 @@ An experimental Flipper Zero app and Android companion app. The phone sends boun
 
 The Flipper app is opened **manually** from **Apps → Tools → Flipper AI Bridge**. Connecting the phone alone does not start it. A one-time app installation is required on the phone and Flipper. After that, the target computer needs no preinstalled bridge app for keyboard and mouse control.
 
+**Manual control update:** the earlier FAP advertised USB ID `0000:0000`, which could prevent a PC from accepting its keyboard/mouse interface. The current FAP selects Flipper firmware's default HID identity and converts modifier key usages correctly. Install **both** current files in `dist/`; the phone now reports when USB HID is unavailable. The Flipper screen must say **USB: HID / CONNECTED** before manual input can reach the PC.
+
 ## What has been checked
 
 | Area | Result |
 |---|---|
-| Android APK build | Passed with Gradle; install and launch observed on Samsung Galaxy A5, Android 8 |
+| Android APK build | Current APK builds with Gradle and uses the same signing certificate as the previous APK; the previous APK was installed and launched on Samsung Galaxy A5, Android 8 |
 | Android/Flipper BLE connection | Pairing, RPC readiness, capability exchange and ping have been observed on the paired devices |
-| Flipper `.fap` build | Passed with official uFBT target 7, API 87.1; file copied to Flipper and read back byte-for-byte |
+| Flipper `.fap` build | Current FAP builds with official uFBT target 7, API 87.1; the previous FAP was copied to Flipper and read back byte-for-byte |
 | Phone camera | A frame appeared in the Android app after **Refresh** on the connected phone |
 | Host protocol and Android core tests | Passed; see [verification results](docs/VERIFY.md) |
 | Flipper USB HID actions on a target PC | **Experimental; not validated end to end** |

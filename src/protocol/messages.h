@@ -40,6 +40,7 @@ typedef enum {
     BridgeResultUnsupported = 4,
     BridgeResultInvalid = 5,
     BridgeResultBusy = 6,
+    BridgeResultUsbUnavailable = 7,
 } BridgeResult;
 
 typedef enum {

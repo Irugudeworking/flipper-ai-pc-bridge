@@ -58,6 +58,8 @@ Plug the Flipper into the target PC with a USB data cable. Once the bridge app i
 
 Try a harmless manual action first: open a blank text editor on the target computer yourself, then use **Manual** in the phone app to send a short key tap or text. Confirm that the text appears in the intended window. Keep the screen visible while testing and stop if input goes to the wrong place.
 
+The Flipper screen must show **USB: HID / CONNECTED**. **PHONE: CONNECTED** or **Bridge ready** only confirms the Bluetooth/app link. If USB says **WAITING**, the phone's Manual action now reports **USB HID not connected**; check the data cable and PC USB port. If an older FAP is installed, replace it with the matching `dist/` version because an earlier build advertised an invalid `0000:0000` USB ID.
+
 ## 6. Choose how the phone sees the screen
 
 | Setting in **Settings → Vision source** | Windows | Linux | What happens |

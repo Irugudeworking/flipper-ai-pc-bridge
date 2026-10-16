@@ -507,8 +507,9 @@ internal class MainViewModel(application: Application) : AndroidViewModel(applic
     fun sendManual(action: AgentAction) {
         if(taskJob?.isActive == true) { setError("Stop or pause the AI task before sending a manual action"); return }
         if(!_ui.value.connected || !client.isReady()) { setError("Connect Flipper before using Manual controls"); return }
-        if(manualBusy) return
+        if(manualBusy) { setError("Wait for the previous manual action to finish"); return }
         manualBusy = true
+        _ui.update { it.copy(lastError = "") }
         viewModelScope.launch {
             try {
                 ActionValidator.validate(listOf(action), 1)
@@ -598,7 +599,9 @@ internal class MainViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private fun resultName(code: Int): String = when(code) {
-        0 -> "SUCCESS"; 1 -> "FAILED"; 2 -> "TIMEOUT"; 3 -> "CANCELLED"; 4 -> "UNSUPPORTED"; 5 -> "INVALID"; 6 -> "BUSY"; else -> "UNKNOWN"
+        0 -> "SUCCESS"; 1 -> "FAILED"; 2 -> "TIMEOUT"; 3 -> "CANCELLED"; 4 -> "UNSUPPORTED"; 5 -> "INVALID"; 6 -> "BUSY"
+        7 -> "USB HID not connected. Check the Flipper screen, USB data cable and PC port"
+        else -> "UNKNOWN"
     }
     private fun u16(value: Int) = byteArrayOf(value.toByte(), (value ushr 8).toByte())
 
@@ -672,7 +675,9 @@ internal class MainViewModel(application: Application) : AndroidViewModel(applic
                     val caps = DeviceCapabilities(input.short.toInt() and 0xFFFF, input.int, input.short.toInt() and 0xFFFF,
                         input.get().toInt() and 0xFF, input.get().toInt() and 0xFF, input.int.toLong() and 0xFFFF_FFFFL)
                     changeAgentState(AgentState.READY)
-                    _ui.update { it.copy(capabilities = caps, bridgeRunning = true, status = "Connected · protocol v${caps.protocolVersion}") }
+                    _ui.update { it.copy(capabilities = caps, bridgeRunning = true,
+                        status = if(caps.keyboard && caps.mouse) "Connected · protocol v${caps.protocolVersion}"
+                                 else "Bridge connected, but USB HID mode failed on Flipper") }
                     appendLog(caps.describe())
                 } else appendLog("Rejected capabilities payload with invalid length")
             }

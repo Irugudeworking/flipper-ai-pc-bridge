@@ -65,6 +65,11 @@ static void write_u32(uint8_t* data, uint32_t value) {
     data[3] = (uint8_t)(value >> 24U);
 }
 
+static BridgeState bridge_connection_state(const BridgeApp* app) {
+    if(!app->hid.initialized) return BridgeStateError;
+    return bridge_hid_connected() ? BridgeStateReady : BridgeStateUsbConnecting;
+}
+
 static void bridge_queue_clear(void* context) {
     BridgeApp* app = context;
     if(app->command_queue) {
@@ -162,6 +167,11 @@ static BridgeResult execute_wait(BridgeApp* app, uint32_t duration_ms) {
 static BridgeResult execute_action(BridgeApp* app, uint8_t type, const uint8_t* payload, uint16_t length) {
     if(!pause_or_cancel(app)) return BridgeResultCancelled;
     if(!bridge_action_payload_valid(type, payload, length)) return BridgeResultInvalid;
+    if(type != BridgeActionWait && type != BridgeActionFinish &&
+       type != BridgeActionRequestScreenshot &&
+       (!app->hid.initialized || !bridge_hid_connected())) {
+        return BridgeResultUsbUnavailable;
+    }
     switch(type) {
     case BridgeActionKeyTap:
         if(length != 2 || read_u16(payload) == 0) return BridgeResultInvalid;
@@ -236,7 +246,9 @@ static BridgeResult execute_batch(BridgeApp* app, const BridgeCommand* command, 
 static void fill_capabilities(BridgeApp* app, uint32_t sequence) {
     uint8_t caps[14] = {0};
     write_u16(caps, BRIDGE_PROTOCOL_VERSION);
-    write_u32(caps + 2, (1U << 0U) | (1U << 1U) | (1U << 5U) | (1U << 6U));
+    uint32_t flags = (1U << 5U) | (1U << 6U);
+    if(app->hid.initialized) flags |= (1U << 0U) | (1U << 1U);
+    write_u32(caps + 2, flags);
     write_u16(caps + 6, BRIDGE_MAX_FRAME);
     caps[8] = BRIDGE_BATCH_MAX_ACTIONS;
     caps[9] = BRIDGE_TEXT_MAX_LENGTH;
@@ -250,7 +262,7 @@ static void process_command(BridgeApp* app, const BridgeCommand* command) {
         uint8_t payload[2] = {BRIDGE_PROTOCOL_VERSION, 0};
         bridge_rpc_send(app, BridgeMsgHelloAck, command->sequence_id, payload, sizeof(payload));
         app->phone_connected = true;
-        app->state = BridgeStateReady;
+        app->state = bridge_connection_state(app);
         send_result(app, command->sequence_id, BridgeResultSuccess, 0);
         FURI_LOG_I("AIBridge", "result seq=%lu code=%u", command->sequence_id, BridgeResultSuccess);
     } else if(command->type == BridgeMsgGetCapabilities) {
@@ -261,7 +273,8 @@ static void process_command(BridgeApp* app, const BridgeCommand* command) {
         bridge_clear_and_release(app);
         app->paused = false;
         app->stop_requested = false;
-        app->state = command->type == BridgeMsgEmergencyStop ? BridgeStateEmergencyStop : BridgeStateReady;
+        app->state = command->type == BridgeMsgEmergencyStop ? BridgeStateEmergencyStop :
+                                                          bridge_connection_state(app);
         send_result(app, command->sequence_id, BridgeResultCancelled, 0);
         bridge_rpc_send(app, BridgeMsgEmergencyStop, command->sequence_id, NULL, 0);
     } else if(command->type == BridgeMsgRequestScreenshot) {
@@ -275,7 +288,7 @@ static void process_command(BridgeApp* app, const BridgeCommand* command) {
         if(result != BridgeResultSuccess) bridge_hid_release_all();
         send_result(app, command->sequence_id, result, completed);
         FURI_LOG_I("AIBridge", "result seq=%lu code=%u actions=%u", command->sequence_id, result, completed);
-        app->state = app->paused ? BridgeStatePaused : BridgeStateReady;
+        app->state = app->paused ? BridgeStatePaused : bridge_connection_state(app);
     } else if(command->type >= BridgeMsgKeyDown && command->type <= BridgeMsgWait) {
         uint8_t action_type = command->type == BridgeMsgKeyTap ? BridgeActionKeyTap :
                               command->type == BridgeMsgTextInput ? BridgeActionTextInput :
@@ -285,20 +298,22 @@ static void process_command(BridgeApp* app, const BridgeCommand* command) {
                               command->type == BridgeMsgHotkey ? BridgeActionHotkey :
                               command->type == BridgeMsgWait ? BridgeActionWait : 0;
         if(command->type == BridgeMsgKeyDown) {
-            BridgeResult result = command->payload_length == 2 &&
-                                  bridge_action_payload_valid(
-                                      BridgeActionKeyTap, command->payload, command->payload_length) &&
-                                  bridge_hid_key_down(read_u16(command->payload)) ?
-                                      BridgeResultSuccess : BridgeResultInvalid;
+            BridgeResult result = BridgeResultInvalid;
+            if(command->payload_length == 2 && bridge_action_payload_valid(
+                                                  BridgeActionKeyTap, command->payload, command->payload_length)) {
+                result = !app->hid.initialized || !bridge_hid_connected() ? BridgeResultUsbUnavailable :
+                         bridge_hid_key_down(read_u16(command->payload)) ? BridgeResultSuccess : BridgeResultFailed;
+            }
             if(result != BridgeResultSuccess) bridge_hid_release_all();
             send_result(app, command->sequence_id, result, 0);
             FURI_LOG_I("AIBridge", "result seq=%lu code=%u", command->sequence_id, result);
         } else if(command->type == BridgeMsgKeyUp) {
-            BridgeResult result = command->payload_length == 2 &&
-                                  bridge_action_payload_valid(
-                                      BridgeActionKeyTap, command->payload, command->payload_length) &&
-                                  bridge_hid_key_up(read_u16(command->payload)) ?
-                                      BridgeResultSuccess : BridgeResultInvalid;
+            BridgeResult result = BridgeResultInvalid;
+            if(command->payload_length == 2 && bridge_action_payload_valid(
+                                                  BridgeActionKeyTap, command->payload, command->payload_length)) {
+                result = !app->hid.initialized || !bridge_hid_connected() ? BridgeResultUsbUnavailable :
+                         bridge_hid_key_up(read_u16(command->payload)) ? BridgeResultSuccess : BridgeResultFailed;
+            }
             if(result != BridgeResultSuccess) bridge_hid_release_all();
             send_result(app, command->sequence_id, result, 0);
             FURI_LOG_I("AIBridge", "result seq=%lu code=%u", command->sequence_id, result);
@@ -309,7 +324,7 @@ static void process_command(BridgeApp* app, const BridgeCommand* command) {
             if(result != BridgeResultSuccess) bridge_hid_release_all();
             send_result(app, command->sequence_id, result, result == BridgeResultSuccess ? 1 : 0);
             FURI_LOG_I("AIBridge", "result seq=%lu code=%u", command->sequence_id, result);
-            app->state = BridgeStateReady;
+            app->state = bridge_connection_state(app);
         }
     } else {
         bridge_hid_release_all();
@@ -384,7 +399,6 @@ int32_t flipper_ai_bridge_app(void* args) {
     rpc_system_app_set_callback(rpc_context, bridge_rpc_event, &app);
     clear_manual_launch_request();
     rpc_system_app_send_started(rpc_context);
-    app.state = BridgeStatePhoneConnected;
 
     while(app.running) {
         bool usb_was_connected = app.usb_connected;

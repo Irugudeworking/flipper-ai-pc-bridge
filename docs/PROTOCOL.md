@@ -27,7 +27,7 @@ Every request uses a nonzero sequence ID. Results echo that ID. A repeated ID wi
 
 ## Action payloads
 
-- `KEY_DOWN`, `KEY_UP`, `KEY_TAP`: `keycode:u16` (USB HID usage; modifiers use separate `HOTKEY`).
+- `KEY_DOWN`, `KEY_UP`, `KEY_TAP`: `keycode:u16` (USB HID usage; modifier usages `0xE0..0xE7` are converted to Flipper HAL modifier bits).
 - `HOTKEY`: `modifier_mask:u8` (`ctrl=1, shift=2, alt=4, gui=8`), then `keycode:u16`.
 - `TEXT_INPUT`: raw printable ASCII bytes only; maximum 96 bytes; never emitted in logs.
 - `MOUSE_MOVE`: signed `dx:i16`, `dy:i16`; implementation splits into signed 8-bit relative HID reports.
@@ -38,9 +38,9 @@ Every request uses a nonzero sequence ID. Results echo that ID. A repeated ID wi
 
 ## Result payloads
 
-`ACTION_RESULT`: `result:u8`, `completed_count:u8`, `detail_code:u16`. Results: success, failed, timeout, cancelled, unsupported, invalid, busy. Human-readable details belong in phone logs, not in binary safety decisions.
+`ACTION_RESULT`: `result:u8`, `completed_count:u8`, `detail_code:u16`. Results: 0 success, 1 failed, 2 timeout, 3 cancelled, 4 unsupported, 5 invalid, 6 busy, 7 USB HID unavailable. Result 7 means the Flipper HID interface is not active or the target computer has not enumerated it. Human-readable details belong in phone logs, not in binary safety decisions.
 
-`CAPABILITIES`: protocol version `u16`, capability bit flags `u32`, max packet `u16`, max batch actions `u8`, max text `u8`, max file size `u32`. v1 flags: keyboard bit0, relative mouse bit1, absolute mouse bit2, USB storage bit3, composite USB bit4, CDC bit5, screenshot helper bit6. This FAP reports bits 0, 1, 5 and 6: screenshot-helper means the experimental fixed PowerShell bootstrap and CDC transfer after an explicit phone request. Storage, composite USB and absolute mouse remain false. Maximum file size is 2 MiB.
+`CAPABILITIES`: protocol version `u16`, capability bit flags `u32`, max packet `u16`, max batch actions `u8`, max text `u8`, max file size `u32`. v1 flags: keyboard bit0, relative mouse bit1, absolute mouse bit2, USB storage bit3, composite USB bit4, CDC bit5, screenshot helper bit6. This FAP reports bits 0 and 1 only if it successfully selected USB HID mode; bits 5 and 6 describe the experimental fixed PowerShell bootstrap and CDC transfer after an explicit phone request. These flags describe the app's features, not the live cable connection. Storage, composite USB and absolute mouse remain false. Maximum file size is 2 MiB.
 
 ## File chunk protocol
 
